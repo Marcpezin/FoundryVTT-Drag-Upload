@@ -1,9 +1,9 @@
 {
-  "name": "dragupload",
-  "id": "dragupload",
-  "title": "Drag Upload (Get Over Here!)",
-  "description": "Adds the ability to drag files onto Foundry to automatically create Tokens, Tiles, Journal Pins, and Ambient Audio",
-  "version": "3.0.0",
+  "name": "dragupload-revived",
+  "id": "dragupload-revived",
+  "title": "Drag Upload Revived",
+  "description": "Adds the ability to drag files onto Foundry to automatically create Tokens, Tiles, Journal Pins, and Ambient Audio. Foundry V13+ rewrite of the original Drag Upload module.",
+  "version": "3.0.1",
   "minimumCoreVersion": "13",
   "compatibleCoreVersion": "13",
   "compatibility": {
