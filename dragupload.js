@@ -5,7 +5,7 @@ const FP = () => foundry.applications.apps.FilePicker.implementation;
 Hooks.once('init', async () => {
     const usingTheForge = typeof ForgeVTT != "undefined" && ForgeVTT.usingTheForge;
 
-    game.settings.register("dragupload", "fileUploadSource", {
+    game.settings.register("dragupload-revived", "fileUploadSource", {
         name: "The path files should be uploaded to",
         scope: "world",
         config: !usingTheForge,
@@ -18,7 +18,7 @@ Hooks.once('init', async () => {
         onChange: async () => { await initializeDragUpload(); }
     });
 
-    game.settings.register("dragupload", "fileUploadFolder", {
+    game.settings.register("dragupload-revived", "fileUploadFolder", {
         name: "The path files should be uploaded to",
         hint: "Should look like 'dragupload/uploaded'",
         scope: "world",
@@ -34,7 +34,7 @@ Hooks.once('init', async () => {
         for (let bucket of buckets.dirs) {
             bucketChoices[bucket] = bucket;
         }
-        game.settings.register("dragupload", "fileUploadBucket", {
+        game.settings.register("dragupload-revived", "fileUploadBucket", {
             name: "If using S3, what S3 bucket should be used",
             scope: "world",
             config: !usingTheForge,
@@ -62,7 +62,7 @@ async function initializeDragUpload() {
     }
 
     let folderParts = [];
-    const targetFolder = game.settings.get("dragupload", "fileUploadFolder");
+    const targetFolder = game.settings.get("dragupload-revived", "fileUploadFolder");
     folderParts = folderParts.concat(targetFolder.split("/")).filter(x => x !== "");
 
     window.dragUpload = {};
@@ -70,7 +70,7 @@ async function initializeDragUpload() {
 }
 
 async function createFoldersIfMissing() {
-    const targetLocation = game.settings.get("dragupload", "fileUploadFolder");
+    const targetLocation = game.settings.get("dragupload-revived", "fileUploadFolder");
     const targetLocationFolders = targetLocation.split("/").filter(x => x !== "");
     let pathParts = [];
     for (const folder of targetLocationFolders) {
@@ -84,8 +84,8 @@ async function createFoldersIfMissing() {
 }
 
 async function createFolderIfMissing(folderPath) {
-    const source = game.settings.get("dragupload", "fileUploadSource");
-    const bucketOpts = source === "s3" ? { bucket: game.settings.get("dragupload", "fileUploadBucket") } : {};
+    const source = game.settings.get("dragupload-revived", "fileUploadSource");
+    const bucketOpts = source === "s3" ? { bucket: game.settings.get("dragupload-revived", "fileUploadBucket") } : {};
     try {
         const result = await FP().browse(source, folderPath);
         if (!result.dir.includes(folderPath)) {
@@ -175,8 +175,8 @@ async function HandleAudioFile(event, file) {
 
 async function uploadOrUseUrl(file, subfolder) {
     if (file.isExternalUrl) return { path: file.url };
-    const source = game.settings.get("dragupload", "fileUploadSource");
-    const bucketOpts = source === "s3" ? { bucket: game.settings.get("dragupload", "fileUploadBucket") } : {};
+    const source = game.settings.get("dragupload-revived", "fileUploadSource");
+    const bucketOpts = source === "s3" ? { bucket: game.settings.get("dragupload-revived", "fileUploadBucket") } : {};
     return FP().upload(source, `${window.dragUpload.targetFolder}/${subfolder}`, file, bucketOpts);
 }
 

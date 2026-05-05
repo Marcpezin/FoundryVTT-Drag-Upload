@@ -52,7 +52,7 @@ Notable changes vs. the upstream forks:
 
 ## Installation
 
-In Foundry's package browser, search for **Drag Upload** — or install manually with this manifest URL:
+In Foundry's package browser, search for **Drag Upload Revived** — or install manually with this manifest URL:
 
 ```
 https://github.com/Marcpezin/FoundryVTT-Drag-Upload/releases/latest/download/module.json
