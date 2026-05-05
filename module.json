@@ -3,25 +3,28 @@
   "id": "dragupload",
   "title": "Drag Upload (Get Over Here!)",
   "description": "Adds the ability to drag files onto Foundry to automatically create Tokens, Tiles, Journal Pins, and Ambient Audio",
-  "version": "2.3.1",
-  "minimumCoreVersion": "9",
-  "compatibleCoreVersion": "12",
-  "compatibility" : {
-    "minimum" : "9",
-    "verified" : "12"
+  "version": "3.0.0",
+  "minimumCoreVersion": "13",
+  "compatibleCoreVersion": "13",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
   },
-  "author": "Cody Swendrowski <cody@swendrowski.us>",
-  "authors": [ { "name" : "Cody Swendrowski <cody@swendrowski.us>"},  { "name" : "Amir Arad <greenshade@gmail.com>"} ],
+  "author": "Marcpezin",
+  "authors": [
+    { "name": "Cody Swendrowski", "email": "cody@swendrowski.us" },
+    { "name": "Amir Arad", "email": "greenshade@gmail.com" },
+    { "name": "Marcpezin", "url": "https://github.com/Marcpezin" }
+  ],
   "esmodules": [
     "./dragupload.js"
   ],
-  "scripts": [
-  ],
-  "styles": [
-  ],
-  "languages": [
-  ],
-  "url": "https://github.com/amir-arad/FoundryVTT-Drag-Upload",
-  "manifest": "https://github.com/amir-arad/FoundryVTT-Drag-Upload/releases/download/latest/module.json",
-  "download": "https://github.com/amir-arad/FoundryVTT-Drag-Upload/releases/download/latest/module.zip"
+  "scripts": [],
+  "styles": [],
+  "languages": [],
+  "url": "https://github.com/Marcpezin/FoundryVTT-Drag-Upload",
+  "manifest": "https://github.com/Marcpezin/FoundryVTT-Drag-Upload/releases/latest/download/module.json",
+  "download": "https://github.com/Marcpezin/FoundryVTT-Drag-Upload/releases/latest/download/module.zip",
+  "bugs": "https://github.com/Marcpezin/FoundryVTT-Drag-Upload/issues",
+  "readme": "https://github.com/Marcpezin/FoundryVTT-Drag-Upload/blob/master/README.md"
 }

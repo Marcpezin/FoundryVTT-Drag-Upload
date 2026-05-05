@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/Foundry-v11-informational)
+![](https://img.shields.io/badge/Foundry-v13-informational)
 
 This is a fork of [the original unmaintained module](https://github.com/cswendrowski/FoundryVTT-Drag-Upload)
 
