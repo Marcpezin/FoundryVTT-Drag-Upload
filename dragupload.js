@@ -99,7 +99,6 @@ async function createFolderIfMissing(folderPath) {
 }
 
 async function handleDrop(event) {
-    event.preventDefault();
     console.debug("Got handleDrop event:");
     console.debug(event);
 
@@ -108,21 +107,30 @@ async function handleDrop(event) {
     console.debug(files);
 
     let file;
-    if (!files || files.length === 0) {
-        let url = event.dataTransfer.getData("Text");
-        if (!url) {
-            console.log("DragUpload | No Files detected, exiting");
-            // Let Foundry handle the event instead
-            canvas._onDrop(event);
+    if (files && files.length > 0) {
+        // Local file drop from the OS
+        file = files[0];
+    } else {
+        // No file — could be a URL dragged from a web browser, or an internal
+        // Foundry drag (Actor/Item/JournalEntry/Macro from a sidebar). Internal
+        // drags use JSON-encoded data; bail out and let Foundry's own canvas
+        // drop handler process them.
+        const text = event.dataTransfer.getData("Text");
+        if (!text) return;
+
+        const trimmed = text.trim();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            console.debug("DragUpload | Internal Foundry drag detected, ignoring");
             return;
         }
+
+        let url = text;
         // trimming query string
         if (url.includes("?")) url = url.substr(0, url.indexOf("?"));
         const splitUrl = url.split("/");
         let filename = splitUrl[splitUrl.length - 1];
         if (!filename.includes(".")) {
             console.log("DragUpload | Dragged non-file text:", url);
-            canvas._onDrop(event);
             return;
         }
         const extension = filename.substr(filename.lastIndexOf(".") + 1);
@@ -131,7 +139,6 @@ async function handleDrop(event) {
             .concat(Object.keys(CONST.AUDIO_FILE_EXTENSIONS));
         if (!validExtensions.includes(extension)) {
             console.log("DragUpload | Dragged file with bad extension:", url);
-            canvas._onDrop(event);
             return;
         }
         // special case: chrome imgur drag from an album gives a low-res webp file instead of a PNG
@@ -140,15 +147,12 @@ async function handleDrop(event) {
             url = url.substr(0, url.length - "_d.webp".length) + ".png";
         }
         file = { isExternalUrl: true, url: url, name: filename };
-    } else {
-        file = files[0];
     }
 
-    if (file == undefined) {
-        console.log("Drag Upload | No Files detected");
-        canvas._onDrop(event);
-        return;
-    }
+    // We have a file we want to process — prevent the browser default (which
+    // would navigate to a dropped URL or open a dropped file).
+    event.preventDefault();
+
     console.debug("file is: ");
     console.debug(file);
 
