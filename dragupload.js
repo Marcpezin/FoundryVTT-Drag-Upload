@@ -102,25 +102,24 @@ async function handleDrop(event) {
     console.debug("Got handleDrop event:");
     console.debug(event);
 
-    const files = event.dataTransfer.files;
+    const files = event.dataTransfer?.files;
     console.debug("FileList is: ");
     console.debug(files);
 
+    // We only act on two cases:
+    //   1. A real OS file is being dropped (dataTransfer.files non-empty).
+    //   2. A clear http(s) URL is being dropped from a web browser.
+    // Any other kind of drop — including all internal Foundry drags
+    // (Actor/Item/JournalEntry from a sidebar, tokens being repositioned,
+    // tiles from a compendium, etc.) — is left untouched so Foundry's own
+    // canvas drop handler can do its job.
+
     let file;
     if (files && files.length > 0) {
-        // Local file drop from the OS
         file = files[0];
     } else {
-        // No file — could be a URL dragged from a web browser, or an internal
-        // Foundry drag (Actor/Item/JournalEntry/Macro from a sidebar). Internal
-        // drags use JSON-encoded data; bail out and let Foundry's own canvas
-        // drop handler process them.
-        const text = event.dataTransfer.getData("Text");
-        if (!text) return;
-
-        const trimmed = text.trim();
-        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-            console.debug("DragUpload | Internal Foundry drag detected, ignoring");
+        const text = (event.dataTransfer.getData("text/plain") || "").trim();
+        if (!text.startsWith("http://") && !text.startsWith("https://")) {
             return;
         }
 
@@ -130,7 +129,7 @@ async function handleDrop(event) {
         const splitUrl = url.split("/");
         let filename = splitUrl[splitUrl.length - 1];
         if (!filename.includes(".")) {
-            console.log("DragUpload | Dragged non-file text:", url);
+            console.log("DragUpload | Dragged URL has no filename:", text);
             return;
         }
         const extension = filename.substr(filename.lastIndexOf(".") + 1);
@@ -138,7 +137,7 @@ async function handleDrop(event) {
             .concat(Object.keys(CONST.VIDEO_FILE_EXTENSIONS))
             .concat(Object.keys(CONST.AUDIO_FILE_EXTENSIONS));
         if (!validExtensions.includes(extension)) {
-            console.log("DragUpload | Dragged file with bad extension:", url);
+            console.log("DragUpload | Dragged URL has unsupported extension:", text);
             return;
         }
         // special case: chrome imgur drag from an album gives a low-res webp file instead of a PNG
@@ -149,9 +148,11 @@ async function handleDrop(event) {
         file = { isExternalUrl: true, url: url, name: filename };
     }
 
-    // We have a file we want to process — prevent the browser default (which
-    // would navigate to a dropped URL or open a dropped file).
+    // We're going to handle this drop — prevent the browser default and stop
+    // propagation so Foundry's own canvas drop handler doesn't also try to
+    // process it.
     event.preventDefault();
+    event.stopPropagation();
 
     console.debug("file is: ");
     console.debug(file);
