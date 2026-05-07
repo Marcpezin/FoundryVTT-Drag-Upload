@@ -49,11 +49,43 @@ Hooks.once('init', async () => {
 Hooks.once('ready', async function () {
     await initializeDragUpload();
 
-    new foundry.applications.ux.DragDrop.implementation({
-        callbacks: {
-            drop: handleDrop
-        }
-    }).bind(document.getElementById("board"));
+    // Drag-and-drop handling needs to cover two distinct paths:
+    //
+    //  - Internal Foundry drags (Actor / Item / JournalEntry from sidebars,
+    //    Compendium entries, etc.) come in through Foundry's own DragDrop
+    //    binding, which calls Canvas#_onDrop. We wrap that method so we can
+    //    intercept first; if the drop is ours we handle it, otherwise we
+    //    delegate to the original handler so Foundry places the document.
+    //
+    //  - Drops of OS files or web-browser URLs do NOT seem to be routed
+    //    through Foundry's Canvas DragDrop in V13 — Foundry's drop handler
+    //    only fires when the drag carries Foundry-formatted JSON data. So
+    //    we additionally bind a DOM `drop` listener on `#board` to catch
+    //    those external drops directly.
+    //
+    // Both paths funnel through `tryHandleExternalDrop`, which uses an
+    // event-level marker to make itself idempotent — even if both paths
+    // fire for the same drop event, the file is uploaded only once.
+
+    const CanvasClass = foundry.canvas?.Canvas ?? globalThis.Canvas;
+    if (CanvasClass?.prototype?._onDrop) {
+        const original = CanvasClass.prototype._onDrop;
+        CanvasClass.prototype._onDrop = async function (event) {
+            const handled = await tryHandleExternalDrop.call(this, event);
+            if (handled) return;
+            return original.call(this, event);
+        };
+    } else {
+        console.warn("DragUpload | Canvas#_onDrop not found, internal drag passthrough may misbehave");
+    }
+
+    const board = document.getElementById("board");
+    if (board) {
+        board.addEventListener("dragover", event => event.preventDefault());
+        board.addEventListener("drop", event => { tryHandleExternalDrop(event); });
+    } else {
+        console.warn("DragUpload | #board element not found, external drops disabled");
+    }
 });
 
 async function initializeDragUpload() {
@@ -98,41 +130,83 @@ async function createFolderIfMissing(folderPath) {
     }
 }
 
-async function handleDrop(event) {
-    event.preventDefault();
-    console.debug("Got handleDrop event:");
-    console.debug(event);
+/**
+ * Inspect the drop event and, if it looks like an external file or web URL we
+ * want to handle, process it. Returns true when we have taken responsibility
+ * for the drop (caller should NOT delegate to Foundry's original handler) or
+ * false when we leave it untouched.
+ *
+ * Idempotent — if called more than once for the same event (e.g. once via the
+ * DOM drop listener and once via the Canvas#_onDrop wrapper), the second call
+ * returns the cached outcome without re-uploading the file.
+ */
+async function tryHandleExternalDrop(event) {
+    if (event._dragUploadOutcome !== undefined) {
+        return event._dragUploadOutcome;
+    }
+    // Initialise to a pending Promise so that overlapping invocations all
+    // wait on the same upload rather than starting their own.
+    let resolveOutcome;
+    event._dragUploadOutcome = new Promise(r => (resolveOutcome = r));
+    try {
+        const result = await processDrop(event);
+        event._dragUploadOutcome = result;
+        resolveOutcome(result);
+        return result;
+    } catch (err) {
+        event._dragUploadOutcome = false;
+        resolveOutcome(false);
+        throw err;
+    }
+}
 
-    const files = event.dataTransfer.files;
-    console.debug("FileList is: ");
-    console.debug(files);
+async function processDrop(event) {
+    console.debug("DragUpload | drop event:", event);
 
+    // Internal Foundry drags carry JSON-encoded document data in one of the
+    // dataTransfer types. If we find any, this drop belongs to Foundry — bail.
+    for (const type of event.dataTransfer.types ?? []) {
+        if (type === "Files") continue;
+        const data = event.dataTransfer.getData(type);
+        if (!data) continue;
+        try {
+            const parsed = JSON.parse(data);
+            if (parsed && typeof parsed === "object") {
+                console.debug("DragUpload | Internal Foundry drag detected, delegating");
+                return false;
+            }
+        } catch { /* not JSON, fall through */ }
+    }
+
+    // Otherwise we only handle two cases:
+    //   1. A real OS file is being dropped (dataTransfer.files non-empty).
+    //   2. A clear http(s) URL is being dropped from a web browser.
+    const files = event.dataTransfer?.files;
     let file;
-    if (!files || files.length === 0) {
-        let url = event.dataTransfer.getData("Text");
-        if (!url) {
-            console.log("DragUpload | No Files detected, exiting");
-            // Let Foundry handle the event instead
-            canvas._onDrop(event);
-            return;
+    if (files && files.length > 0) {
+        file = files[0];
+    } else {
+        const text = (event.dataTransfer.getData("text/plain") || "").trim();
+        if (!text.startsWith("http://") && !text.startsWith("https://")) {
+            return false;
         }
+
+        let url = text;
         // trimming query string
         if (url.includes("?")) url = url.substr(0, url.indexOf("?"));
         const splitUrl = url.split("/");
         let filename = splitUrl[splitUrl.length - 1];
         if (!filename.includes(".")) {
-            console.log("DragUpload | Dragged non-file text:", url);
-            canvas._onDrop(event);
-            return;
+            console.log("DragUpload | Dragged URL has no filename:", text);
+            return false;
         }
         const extension = filename.substr(filename.lastIndexOf(".") + 1);
         const validExtensions = Object.keys(CONST.IMAGE_FILE_EXTENSIONS)
             .concat(Object.keys(CONST.VIDEO_FILE_EXTENSIONS))
             .concat(Object.keys(CONST.AUDIO_FILE_EXTENSIONS));
         if (!validExtensions.includes(extension)) {
-            console.log("DragUpload | Dragged file with bad extension:", url);
-            canvas._onDrop(event);
-            return;
+            console.log("DragUpload | Dragged URL has unsupported extension:", text);
+            return false;
         }
         // special case: chrome imgur drag from an album gives a low-res webp file instead of a PNG
         if (url.includes("imgur") && filename.endsWith("_d.webp")) {
@@ -140,21 +214,17 @@ async function handleDrop(event) {
             url = url.substr(0, url.length - "_d.webp".length) + ".png";
         }
         file = { isExternalUrl: true, url: url, name: filename };
-    } else {
-        file = files[0];
     }
 
-    if (file == undefined) {
-        console.log("Drag Upload | No Files detected");
-        canvas._onDrop(event);
-        return;
-    }
-    console.debug("file is: ");
-    console.debug(file);
+    // We're taking this drop — prevent the browser default (which would
+    // navigate to a dropped URL or open a dropped file).
+    event.preventDefault();
+
+    console.debug("DragUpload | handling file:", file);
 
     if (Object.keys(CONST.AUDIO_FILE_EXTENSIONS).filter(x => x != "webm" && file.name.endsWith(x)).length > 0) {
         await HandleAudioFile(event, file);
-        return;
+        return true;
     }
 
     const layer = game.canvas.activeLayer?.name ?? "";
@@ -166,6 +236,7 @@ async function handleDrop(event) {
     } else {
         await CreateTile(event, file);
     }
+    return true;
 }
 
 async function HandleAudioFile(event, file) {
